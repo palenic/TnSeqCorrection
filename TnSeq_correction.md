@@ -10,9 +10,7 @@ output:
     toc: yes
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+
 
 BCG UNIMI - Advanced genomics class 2021 
 
@@ -34,7 +32,8 @@ Then we can compute an average fitness value for each gene with a weighted avera
   
 Let us take a look at the fitness values. For each gene we define the genomic coordinate as the middle point between the start and the end of the gene.
 
-```{r fig.width = 10,fig.height = 6}
+
+```r
 #code from Brilli M.
 fData<-read.delim("Tn_seq_fitness_data_Opijnen_et_al_2009.txt",header=TRUE,stringsAsFactors = FALSE,sep = "\t")
 geneCoord<-read.delim("GCF_000006885.1_ASM688v1_genomic_olt.txt",header=FALSE,stringsAsFactors = FALSE,sep = "\t")
@@ -53,7 +52,38 @@ fitness_by_coord<-data.frame("genomic coordinates"=gen_coords,"avg gene fitness"
 fitness_by_coord$type <- cut(fitness_by_coord$avg.gene.fitness,breaks=c(0,0.96,1.04,Inf),
                              labels=c("disadvanteageous","neutral","advantageous"))
 library(patchwork)
+```
+
+```
+## Warning: package 'patchwork' was built under R version 4.0.3
+```
+
+```r
 library(dplyr)
+```
+
+```
+## Warning: package 'dplyr' was built under R version 4.0.3
+```
+
+```
+## 
+## Attaching package: 'dplyr'
+```
+
+```
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+```
+
+```
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+```
+
+```r
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 #scatterplot+ colored scatterplot based on category
 p1<-ggplot(data=fitness_by_coord,aes())+
@@ -67,8 +97,9 @@ p2<-ggplot(data=fitness_by_coord,aes())+
 # bar chart for category
 p3<-ggplot(fitness_by_coord)+geom_bar(aes(y=type,fill=type))+scale_fill_manual(values=c(cbbPalette[7],cbbPalette[1],cbbPalette[3]))+theme_minimal()
 p1 + p2 + p3 + guide_area() + plot_layout(ncol = 2, guides = "collect")
-
 ```
+
+![](TnSeq_correction_files/figure-html/unnamed-chunk-1-1.png)<!-- -->
 
 
 As we expect, most genes fall into the neutral category. However, the fitness values appear to have a trend depending on the position: closer to the origin of replication, the fitness values increase. We will try to quantify and remove this trend, and finally re-evaluate gene fitness.
@@ -76,18 +107,24 @@ As we expect, most genes fall into the neutral category. However, the fitness va
 ## 2. Effect estimation
 
 Adding a smoothing function to the plot we can more clearly see the trend.
-```{r}
+
+```r
 ggplot(data=fitness_by_coord,aes())+
     geom_point(aes(x=genomic.coordinates, y=avg.gene.fitness))+
     geom_smooth(aes(x=genomic.coordinates, y=avg.gene.fitness),method = "loess")+
     labs(title="fitness by genomic position")+theme_minimal()
-
+```
 
 ```
+## `geom_smooth()` using formula 'y ~ x'
+```
+
+![](TnSeq_correction_files/figure-html/unnamed-chunk-2-1.png)<!-- -->
 
 We can analyse this trend by splitting the dataset into windows and computing the mean fitness for each.
 
-```{r fig.height = 5}
+
+```r
 window_size<-100000
 L<-max(geneCoord$V3)
 #defining windows as breaks 
@@ -101,20 +138,45 @@ colnames(new_data)=c("fitness","window")
 
 #computing mean values by window with summarise
 new2<-new_data %>% group_by(window) %>% summarise(avg_fit=mean(fitness))
+```
 
+```
+## `summarise()` ungrouping output (override with `.groups` argument)
+```
+
+```r
 #checking how many genes are in each window
 count_per_window<-new_data %>% group_by(window) %>% summarise(count_genes=n())
+```
 
+```
+## `summarise()` ungrouping output (override with `.groups` argument)
+```
+
+```r
 #i use the middle position of each window for plotting
 mid_pos<-gen_windows+window_size/2
 mid_pos<-mid_pos[-length(mid_pos)]
 new2$mid_pos<-mid_pos
 plot(x=new2$window,y=new2$avg_fit)
+```
+
+![](TnSeq_correction_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
+
+```r
 #plot mean values
 ggplot(new2,aes(x=mid_pos,y=avg_fit))+geom_point()+
   #ylim(0.5,1.27)+
   geom_smooth()
+```
 
+```
+## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+```
+
+![](TnSeq_correction_files/figure-html/unnamed-chunk-3-2.png)<!-- -->
+
+```r
 #compare original values, mean over the windows, and smoothing function
 ggplot()+geom_point(data=fitness_by_coord,aes(x=genomic.coordinates,y=avg.gene.fitness))+
   geom_line(data=new2,aes(x=mid_pos,y=avg_fit,color="average in 100kbp window"),size=1)+
@@ -124,15 +186,23 @@ ggplot()+geom_point(data=fitness_by_coord,aes(x=genomic.coordinates,y=avg.gene.f
   theme(legend.position = "bottom")
 ```
 
+```
+## `geom_smooth()` using formula 'y ~ x'
+```
+
+![](TnSeq_correction_files/figure-html/unnamed-chunk-3-3.png)<!-- -->
+
 The mean values have the same "smile" trend.
 We can analyze this trend by fitting a regression model. Since the data has a smile shape, we have two options:
 1. we split the data in two and use one half of the data as a training set and the other as a test set for a simple linear regression model.
 2. we fit a model that takes this shape into account and we randomly select the training and test set.
-```{r}
+
+```r
 #split the data in two
 ```
 Periodic functions such as sine and cosine are an option for this kind of periodic data. Another option is using a polynomial regression by introducing a quadratic term (in simpler words, using the square of genomic coordinates to achieve a parabola-like shape).
-```{r}
+
+```r
 #define train and test datasets
 fitness_by_coord$scaled_coord<-fitness_by_coord$genomic.coordinates/1e6
 train<-sample(nrow(fitness_by_coord),size =nrow(fitness_by_coord)/2+1)
@@ -143,18 +213,64 @@ train<-fitness_by_coord[train,]
 
 ggplot(train,aes(x=scaled_coord, y=avg.gene.fitness))+geom_point()+
   labs(title="Training set")
+```
 
+![](TnSeq_correction_files/figure-html/unnamed-chunk-5-1.png)<!-- -->
+
+```r
 #training the model with a quadratic term of genomic coordinates
 mq<-lm(avg.gene.fitness~scaled_coord+I(scaled_coord^2),data=train)
 summary(mq)
-plot(mq)
+```
 
+```
+## 
+## Call:
+## lm(formula = avg.gene.fitness ~ scaled_coord + I(scaled_coord^2), 
+##     data = train)
+## 
+## Residuals:
+##       Min        1Q    Median        3Q       Max 
+## -0.294936 -0.010180  0.006864  0.019693  0.233871 
+## 
+## Coefficients:
+##                    Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)        1.032324   0.005462 188.985  < 2e-16 ***
+## scaled_coord      -0.084987   0.011443  -7.427 2.91e-13 ***
+## I(scaled_coord^2)  0.040951   0.005077   8.065 2.74e-15 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.0493 on 783 degrees of freedom
+## Multiple R-squared:  0.07935,	Adjusted R-squared:  0.077 
+## F-statistic: 33.74 on 2 and 783 DF,  p-value: 8.759e-15
+```
+
+```r
+plot(mq)
+```
+
+![](TnSeq_correction_files/figure-html/unnamed-chunk-5-2.png)<!-- -->![](TnSeq_correction_files/figure-html/unnamed-chunk-5-3.png)<!-- -->![](TnSeq_correction_files/figure-html/unnamed-chunk-5-4.png)<!-- -->![](TnSeq_correction_files/figure-html/unnamed-chunk-5-5.png)<!-- -->
+
+```r
 ggplot()+geom_point(aes(x=genomic.coordinates,y=avg.gene.fitness),data=train)+
   geom_line(aes(x=train$genomic.coordinates,y=mq$fitted.values,
                 color="fitted values"),size=1)+
   labs(colour="")
-shapiro.test(mq$residuals)
+```
 
+![](TnSeq_correction_files/figure-html/unnamed-chunk-5-6.png)<!-- -->
+
+```r
+shapiro.test(mq$residuals)
+```
+
+```
+## 
+## 	Shapiro-Wilk normality test
+## 
+## data:  mq$residuals
+## W = 0.79659, p-value < 2.2e-16
 ```
 
 The model seems to fit nicely. The R-squared statistic is very low, however this is in some part expected, because we have a very important factor affecting the fitness value besides the genomic coordinate, which is of course the real fitness value of the gene. The most important thing to notice is that both terms depending on genomic.coordinates have a low p-value; this means they have a significant effect on the fitness. 
@@ -163,23 +279,54 @@ However, we just want a model that represents well enough the increasing trend i
 Let us try to fit a trigonometric function. First we will convert the genomic coordinates in radians. Then, we choose the cosine function, since it has higher values at angles 0 and 2 $\Pi$.
 
 
-```{r}
+
+```r
 train$circular_coords<-train$genomic.coordinates/L*2*pi
 mt<-lm(avg.gene.fitness~cos(circular_coords),data=train)
 summary(mt)
+```
+
+```
+## 
+## Call:
+## lm(formula = avg.gene.fitness ~ cos(circular_coords), data = train)
+## 
+## Residuals:
+##       Min        1Q    Median        3Q       Max 
+## -0.301796 -0.010541  0.006669  0.019125  0.234834 
+## 
+## Coefficients:
+##                      Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)          1.004343   0.001761 570.400  < 2e-16 ***
+## cos(circular_coords) 0.020042   0.002498   8.023 3.75e-15 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.04936 on 784 degrees of freedom
+## Multiple R-squared:  0.07588,	Adjusted R-squared:  0.0747 
+## F-statistic: 64.37 on 1 and 784 DF,  p-value: 3.75e-15
+```
+
+```r
 plot(mq)
+```
+
+![](TnSeq_correction_files/figure-html/unnamed-chunk-6-1.png)<!-- -->![](TnSeq_correction_files/figure-html/unnamed-chunk-6-2.png)<!-- -->![](TnSeq_correction_files/figure-html/unnamed-chunk-6-3.png)<!-- -->![](TnSeq_correction_files/figure-html/unnamed-chunk-6-4.png)<!-- -->
+
+```r
 ggplot()+geom_point(aes(x=genomic.coordinates,y=avg.gene.fitness),data=train)+
   geom_line(aes(x=train$genomic.coordinates,y=mt$fitted.values,
                 color="fitted values"),size=1)+
   labs(colour="")
-
 ```
+
+![](TnSeq_correction_files/figure-html/unnamed-chunk-6-5.png)<!-- -->
 Trigonometric functions add a flex point in the trend that is not really visible in the original data, so this might not be the best model. However, the R suqred score is marginally higher.
 Another approach we can take is using a non-parametric model such as LOESS. This model does not make any assumptions on the data and performs a local regression (...). This will give us a similar result to what we saw before with the `geom_smooth()` function.
 
 
-```{r}
 
+```r
 # yp<-predict(m4,newdata=test,se.fit = T)
 # plot(test$genomic.coordinates,test$avg.gene.fitness)
 # lines(test$genomic.coordinates,yp$fit,col="red")
@@ -208,7 +355,8 @@ Another approach we can take is using a non-parametric model such as LOESS. This
 
 
 
-```{r}
+
+```r
 # l<-max(gen_coords)
 # L<-max(geneCoord$V3)
 # n<-length(gen_coords)
@@ -250,7 +398,8 @@ Another approach we can take is using a non-parametric model such as LOESS. This
 # ggplot(new2,aes(x=mid_pos,y=avg_fit))+geom_point()+ylim(0.5,1.27)+geom_smooth()
 ```
 
-```{r}
+
+```r
 # l2<-dim(new2)[1]
 # #train<-window_df[seq(1,l2/2),]
 # #test<-window_df[seq(l2/2+1,l2),]
